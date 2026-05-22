@@ -1,98 +1,85 @@
-# Arquitetura Detalhada: Pipeline de Dados Olist
+# Arquitetura do Sistema - Northwind Data Pipeline (Modelo Medalhão)
 
-Esta documentação detalha a arquitetura técnica, ferramentas e protocolos, mapeando-os aos Requisitos Funcionais (RF) e Não Funcionais (RNF).
+Este documento descreve a arquitetura do Northwind Data Pipeline focada em processamento **Batch** e na **Arquitetura Medalhão**, utilizando o framework RM-ODP.
 
----
+## 1. RM-ODP Viewpoints
 
-## 1. Enterprise Viewpoint (Visão de Negócio)
-Foca no propósito e conformidade.
+### 1.1 Enterprise Viewpoint
+- **Objetivo:** Processamento confiável de grandes volumes em batch.
+- **Políticas:** 
+    - Arquitetura Medalhão (Bronze -> Silver -> Gold).
+    - Monitoramento 100% via Logs (Sem notificações externas).
+    - Idempotência em todas as camadas.
 
-- **Objetivo:** Processamento de 100k pedidos/dia para dashboard analítico.
-- **Conformidade (PII):** Mascaramento de dados sensíveis via **Python Hashlib** ou substituição de strings. (RF20)
-- **Gestão de Custos:** Monitoramento de créditos do Learner Lab via **AWS Budgets** (apenas visualização). (RNF16)
-- **Governança:** Trilha de auditoria gravada em tabela `audit_log` no RDS. (RF19)
+### 1.2 Information Viewpoint
+Define o ciclo de vida do dado nas camadas Medalhão:
+- **Landing Zone (MinIO):** Arquivos CSV originais e imutáveis.
+- **Bronze (ClickHouse):** Tabelas espelho do CSV. Preserva histórico bruto para auditoria.
+- **Silver (ClickHouse):** Dados limpos, tipados e enriquecidos. Joins realizados.
+- **Gold (ClickHouse):** Tabelas de performance e agregados de negócio (Data Marts).
 
-**RFs:** RF19, RF20, RF30 | **RNFs:** RNF12, RNF14, RNF16.
+### 1.3 Computational Viewpoint
+- **Batch Orchestrator:** Gerencia a execução sequencial das camadas.
+- **Bronze Loader:** Move dados do MinIO para o ClickHouse (Bronze).
+- **Silver Transformer:** Processa limpeza e unificação (Silver).
+- **Gold Aggregator:** Gera visões de negócio (Gold).
+- **Log Monitor:** Centraliza a telemetria JSON de todos os estágios.
 
----
-
-## 2. Information Viewpoint (Visão de Informação)
-Foca no ciclo de vida e estrutura do dado.
-
-- **Ingestão:** Arquivos `.csv` com encoding `UTF-8`. (RF01)
-- **Estrutura de Armazenamento (AWS S3):**
-    - `s3://[BUCKET_NAME]/landing/`: Destino de upload inicial; gatilho para a Lambda.
-    - `s3://[BUCKET_NAME]/processed/`: Destino de arquivos processados com sucesso.
-    - `s3://[BUCKET_NAME]/failed/`: Destino de arquivos que falharam na integridade ou validação inicial.
-- **Esquemas de Banco de Dados (Postgres 16):**
-    - `raw_zone`: Tabelas temporárias de staging (Unlogged tables para performance). (RF09)
-    - `analytics_zone`: Tabelas finais indexadas por `order_id`. (RF03, RF04)
-    - `error_zone`: Tabelas de Dead Letter (DLT) com colunas de erro e stacktrace. (RF05, RF31)
-- **Qualidade:** Validação de tipos e regras de negócio via **Pydantic** ou **Pandas Validation**. (RF02, RF14, RF29)
-
-**RFs:** RF02, RF04, RF05, RF06, RF14, RF15, RF21, RF22, RF28, RF31 | **RNFs:** RNF01, RNF18.
+### 1.4 Engineering Viewpoint
+- **Processamento:** Containers Python stateless escaláveis para lotes volumosos.
+- **Banco Analítico:** ClickHouse organizado em múltiplos bancos de dados ou esquemas para representar as camadas Medalhão.
+- **Observability:** Logs JSON redirecionados para o stdout do Docker para coleta passiva.
 
 ---
 
-## 3. Computational Viewpoint (Visão Computacional)
-Foca nos módulos de processamento e bibliotecas Python.
+## 2. ADRs (Architecture Decision Records)
 
-- **Trigger (AWS Lambda):** Código em Python 3.12 usando **Boto3** para disparar o `ecs.run_task`. (RF01)
-- **ETL Engine (ECS Fargate):**
-    - **Extract:** **Boto3** para streaming de arquivos do S3. (RNF17)
-    - **Transform:** **Pandas** para limpeza, deduplicação e normalização. (RF21, RF22, RF23)
-    - **Load:** **Psycopg2** com o método `copy_expert` para Bulk Load via stdin. (RNF02, RNF19)
-- **Observabilidade:** **Python Logging** com formatador JSON para CloudWatch. (RNF13)
-- **Migrações:** **Alembic** para versionamento de schema. (RNF18)
+### ADR 01: Uso do ClickHouse como Banco Analítico (OLAP)
+- **Contexto:** Necessidade de processar e consultar ~100k registros diários com alta performance agregada.
+- **Decisão:** Adotar o ClickHouse como motor principal para as camadas Medalhão.
+- **Consequências:** Alta performance em queries analíticas, mas exige gerenciamento rigoroso de idempotência em sistemas batch.
 
-**RFs:** RF07, RF08, RF10, RF21, RF22, RF23, RF24, RF26, RF27 | **RNFs:** RNF06, RNF11, RNF13, RNF15, RNF17, RNF18.
+### ADR 02: Arquitetura Medalhão (Bronze, Silver, Gold)
+- **Contexto:** Necessidade de rastreabilidade, qualidade de dados e separação entre dados brutos e analíticos.
+- **Decisão:** Estruturar o banco de dados em camadas Bronze (Raw), Silver (Cleaned/Unified) e Gold (Aggregated).
+- **Consequências:** Clareza na linhagem de dados e facilidade de reprocessamento, com custo incremental de storage.
 
----
+### ADR 03: Landing Zone no MinIO com Retenção de 7 Dias
+- **Contexto:** Garantir a integridade dos dados originais e permitir Replay (RF-08) sem esgotar o storage.
+- **Decisão:** Persistir CSVs brutos no MinIO por 7 dias fixos antes do expurgo automático.
+- **Consequências:** Permite auditoria e recuperação de falhas recentes de forma eficiente.
 
-## 4. Engineering Viewpoint (Visão de Engenharia)
-Foca na infraestrutura AWS e conectividade.
+### ADR 04: Monitoramento Exclusivo via Logs Estruturados (Log-only)
+- **Contexto:** Simplificação da infraestrutura e foco em observabilidade SRE passiva.
+- **Decisão:** Não utilizar notificações externas (Slack/Email). Toda a telemetria será via logs JSON.
+- **Consequências:** Reduz complexidade no código, mas exige ferramentas de parsing para monitoramento de saúde.
 
-- **Rede (VPC):**
-    - **Subnets Privadas:** Onde residem o ECS Fargate e o RDS. (RNF05)
-    - **S3 Gateway Endpoint:** Acesso gratuito e interno ao S3. (RNF05)
-    - **Interface Endpoints (PrivateLink):** Para Secrets Manager, CloudWatch e ECR. (RNF05)
-- **Segurança:** 
-    - **Secrets Manager:** Armazena JSON com credenciais do DB (host, user, pwd). (RNF04, RNF09)
-    - **Security Groups:** Regras de ingresso restritas ao tráfego do ECS para o RDS (Porta 5432). (RNF05)
-- **Notificações:** **AWS SNS** para disparar e-mails em falhas críticas. (RF10, RF13)
+### ADR 05: Processamento Stateless na Camada Silver
+- **Contexto:** Suportar picos de carga e garantir o SLO de processamento de 2h através de escalabilidade horizontal.
+- **Decisão:** O componente de transformação (Silver) deve ser stateless, processando lotes de forma isolada.
+- **Consequências:** Facilita o uso de múltiplos workers Docker, movendo o controle de unicidade para o Loader/ClickHouse.
 
-**RFs:** RF01, RF03, RF10, RF12, RF16, RF18 | **RNFs:** RNF02, RNF03, RNF04, RNF05, RNF08, RNF09, RNF10, RNF19, RNF20.
+### ADR 06: Injeção de Audit Trail em Camadas
+- **Contexto:** Necessidade de rastrear a linhagem (Audit Trail) desde o arquivo de origem até o KPI final (RF-10).
+- **Decisão:** Adicionar colunas `source_file`, `batch_id` e `loaded_at` nas camadas Silver e Gold.
+- **Consequências:** Facilita troubleshooting e auditoria de dados, com custo marginal de storage.
 
----
+### ADR 07: Python 3.11+ para Lógica de Orquestração Batch
+- **Contexto:** Necessidade de linguagem versátil com suporte a processamento de dados e APIs de storage/DB.
+- **Decisão:** Utilizar Python 3.11+ para o Batch Manager e componentes ETL.
+- **Consequências:** Desenvolvimento ágil e vasta biblioteca de integração disponível.
 
-## 5. Technology Viewpoint (Visão de Tecnologia)
-Especificação exata das versões e ferramentas.
+### ADR 08: MinIO (S3 API) para Abstração de Storage
+- **Contexto:** Garantir portabilidade entre ambientes locais (Docker) e nuvem (AWS S3).
+- **Decisão:** Utilizar o MinIO como Landing Zone via API S3.
+- **Consequências:** O código de integração permanece o mesmo em qualquer ambiente compatível com S3.
 
-- **Linguagem:** Python 3.12.
-- **Bibliotecas Principais:** `pandas==2.2.0`, `psycopg2-binary==2.9.9`, `boto3==1.34.0`, `pydantic==2.6.0`, `alembic==1.13.0`.
-- **Infrastructure as Code:** Terraform 1.7+.
-- **Database:** Amazon RDS for PostgreSQL 16.1-R1 (Single-AZ para custo Learner Lab).
-- **Container:** Docker Engine 25.0 (Alpine-based image para leveza).
-- **Protocolos:** TLS 1.2 para todas as conexões (JDBC/S3 API).
+### ADR 09: Docker Compose para Padronização de Ambiente
+- **Contexto:** Garantir que o pipeline funcione de forma idêntica em desenvolvimento e produção local (SRE).
+- **Decisão:** Utilizar Docker Compose para orquestrar os containers das camadas Medalhão.
+- **Consequências:** Ambiente reprodutível e isolado, facilitando testes de integração e fumaça.
 
----
-
-## ADRs (Architecture Decision Records)
-
-### ADR 01: Processamento em Chunks com Pandas/Psycopg2
-- **Contexto:** Arquivos de 100k podem ocupar muita RAM no container Fargate.
-- **Decisão:** Usar `pandas.read_csv(chunksize=10000)` e carregar no Postgres via buffer `io.StringIO` com o comando `COPY`.
-- **Consequências:** Uso de memória estável (< 512MB) e alta velocidade de carga, atendendo RNF02 e RNF17.
-
-### ADR 02: Validação de Schema com Pydantic
-- **Contexto:** Necessidade de garantir integridade dos dados (tipos e regras) antes de tocar no banco.
-- **Decisão:** Utilizar Pydantic Models para validar cada linha do DataFrame.
-- **Consequências:** Erros de validação capturados precocemente e enviados para a DLT de forma estruturada (RF02, RF05, RF14).
-
-### ADR 03: VPC Interface Endpoints para Secrets e CloudWatch
-- **Contexto:** O Learner Lab não permite NAT Gateways de alto custo para acesso à internet a partir de subnets privadas.
-- **Decisão:** Utilizar VPC Endpoints (Interface) para serviços críticos da AWS.
-- **Consequências:** Segurança aumentada e custo de tráfego reduzido, garantindo que o ECS possa buscar segredos e enviar logs sem sair da rede AWS (RNF05).
-
----
-*Restrições Academy Lab: Sem Glue, Sem Redshift, Sem NAT Gateway (custo), Sem Kinesis.*
+### ADR 10: Estratégia de Carga via Staging Tables (Atomic Load)
+- **Contexto:** Evitar dados parciais ou corrompidos na tabela final durante falhas no meio do lote batch.
+- **Decisão:** Carregar dados em uma tabela `staging` antes do swap ou merge atômico para a produção.
+- **Consequências:** Garante a integridade da camada analítica e evita o "sofrimento silencioso".
