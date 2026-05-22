@@ -14,8 +14,9 @@ A fase de Engenharia e SRE já foi concluída e está totalmente documentada na 
 - **Requisitos (`01_` e `02_`):** Detalhamento de 10 Requisitos Funcionais e 11 Não Funcionais (SLIs/SLOs focados em throughput e resiliência).
 - **Arquitetura (`03_`):** Visão RM-ODP e registro de 10 Decisões Arquiteturais (ADRs).
 - **Rastreabilidade (`04_rtm.md`):** Matriz RTM garantindo que cada requisito seja coberto por um componente e um teste.
-- **Planos de Teste (`05_`, `06_`, `07_`):** Estratégias de validação para Modelagem (Qualidade dos Dados), Carga (Performance/SRE) e Segurança (Integridade).
+- **Planos de Teste (`05_`, `06_`, `07_`):** Estratégias de validação para Modelagem (Qualidade dos Dados), Carga (Performance/SRE via **K6**) e Segurança (Integridade).
 - **System Design (`08_system_design.md`):** O blueprint técnico detalhando a estrutura do código e os esquemas do banco.
+- **Modelagem de Dados (`09_data_modeling.md`):** Documentação dos modelos Conceitual, Lógico e Físico (3 níveis).
 - **Índice (`00_index.md`):** Guia rápido para navegar por todos esses artefatos.
 
 ---
@@ -34,3 +35,11 @@ A stack tecnológica principal é composta por:
 5.  **Observabilidade:** Monitoramento SRE passivo, onde 100% da telemetria é baseada em logs JSON estruturados emitidos pelos containers.
 
 *(Nota: O diagrama detalhado da arquitetura (Mermaid), os modelos lógicos/físicos e as instruções de execução via `docker-compose` serão adicionados a este README durante a fase de implementação).*
+
+---
+
+## 🚀 Próximos Passos
+1.  **Implementação do Dashboard:** Criar a interface Streamlit para visualização dos agregados da camada Gold.
+2.  **Orquestração Local:** Subir o ambiente completo via `docker-compose up`.
+3.  **Execução do Pipeline:** Validar o processamento batch end-to-end (CSV -> MinIO -> Medalhão -> Gold).
+4.  **Testes de Estresse (K6):** Executar bateria de testes de carga para validar os SLOs de performance e resiliência da UI/ClickHouse.

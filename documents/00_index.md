@@ -13,6 +13,7 @@ Este índice centraliza todos os artefatos técnicos e de planejamento produzido
 ## 3. Arquitetura e Design
 - [03_architecture.md](03_architecture.md): Documento de arquitetura seguindo o framework RM-ODP e registro de 10 ADRs.
 - [08_system_design.md](08_system_design.md): Blueprint técnico detalhando a estrutura de pastas, componentes de software e stack tecnológica.
+- [09_data_modeling.md](09_data_modeling.md): Modelagem Conceitual, Lógica e Física (3 níveis) da base Northwind.
 
 ## 4. Planos de Teste (Estratégia de Validação)
 - [07_test_plan_modeling.md](07_test_plan_modeling.md): Estratégia de validação da qualidade, integridade e semântica dos dados.

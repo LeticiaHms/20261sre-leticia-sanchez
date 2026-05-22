@@ -30,6 +30,7 @@ Focado na performance do pipeline Northwind operando em lotes diários de 100.00
     - **Cenário:** Streamlit consultando a camada Gold pré-agregada com 1M+ registros.
     - **SLO:** < 5 segundos de carregamento.
 
-## 3. Observabilidade e Telemetria
-- **Logs:** Auditoria dos campos `layer`, `batch_id` e `duration_ms` para identificar gargalos em camadas específicas.
-- **Resources:** Monitoramento de uso de memória do container ETL durante o processamento da camada Silver.
+## 3. Ferramentas e Infraestrutura
+- **K6:** Utilizado para testes de estresse e carga, simulando múltiplos usuários acessando simultaneamente o dashboard e realizando queries no ClickHouse.
+- **Gerador de Carga:** Script Python para gerar massa de dados sintética de 100k+ registros.
+- **Monitoramento:** Telemetria via logs JSON estruturados e métricas de container.

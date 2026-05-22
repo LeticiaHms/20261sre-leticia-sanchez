@@ -1,0 +1,8 @@
+pandas
+pydantic
+pydantic-settings
+structlog
+boto3
+clickhouse-connect
+polars
+pytest
