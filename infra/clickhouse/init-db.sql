@@ -15,7 +15,6 @@ ORDER BY (tag, unixtime);
 
 -- Create Northwind Analytical Database
 CREATE DATABASE IF NOT EXISTS northwind;
-...
 
 --------------------------------------------------------------------------------
 -- 1. CAMADA BRONZE (EMERGENT VIEWS)
@@ -70,6 +69,7 @@ CREATE TABLE IF NOT EXISTS silver_orders_unified (
     unit_price Decimal(12, 4),
     quantity UInt16,
     discount Float32,
+    freight Decimal(12, 4),
     total_price Decimal(12, 4), -- unit_price * quantity * (1 - discount)
     ship_country String,
     ship_city String,
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS gold_geographic_distribution (
     unique_customers UInt32,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
-ORDER BY (ship_country, total_revenue DESC);
+ORDER BY (ship_country, total_revenue);
 
 -- 4. Portfólio: Top Produtos por Receita
 CREATE TABLE IF NOT EXISTS gold_top_products (
@@ -123,4 +123,31 @@ CREATE TABLE IF NOT EXISTS gold_top_products (
     total_quantity UInt32,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
-ORDER BY total_revenue DESC;
+ORDER BY total_revenue;
+
+-- 5. Operação: Volume de Pedidos por Status
+CREATE TABLE IF NOT EXISTS gold_order_status (
+    status String,
+    order_count UInt32,
+    total_revenue Decimal(18, 4),
+    loaded_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY status;
+
+-- 6. Retenção: Taxa de Recompra
+CREATE TABLE IF NOT EXISTS gold_customer_retention (
+    total_customers UInt32,
+    repeat_customers UInt32,
+    rebuy_rate Float64,
+    loaded_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY loaded_at;
+
+-- 7. Vendas: Performance por Vendedor
+CREATE TABLE IF NOT EXISTS gold_seller_performance (
+    employee_id String,
+    total_revenue Decimal(18, 4),
+    order_count UInt32,
+    loaded_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY total_revenue;

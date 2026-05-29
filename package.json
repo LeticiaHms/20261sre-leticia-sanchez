@@ -1,0 +1,12 @@
+{
+  "name": "northwind-performance-tests",
+  "version": "1.0.0",
+  "description": "K6 performance tests for Northwind Pipeline",
+  "scripts": {
+    "test:load": "k6 run tests/performance/load-test.js",
+    "test:stress": "k6 run tests/performance/stress-test.js",
+    "test:spike": "k6 run tests/performance/spike-test.js",
+    "test:endurance": "k6 run tests/performance/endurance-test.js",
+    "test:all": "npm run test:load && npm run test:stress && npm run test:spike"
+  }
+}

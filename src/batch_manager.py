@@ -1,5 +1,6 @@
 import uuid
 import os
+import time
 from common.logger import logger
 from common.config import config
 from ingestor.minio_client import MinioClient
@@ -26,6 +27,7 @@ class BatchManager:
         self.local_spec_path = "documents/spec/"
 
     def run_pipeline(self):
+        start_time = time.time()
         self.logger.info("Iniciando Pipeline Northwind", mode="Batch")
         
         try:
@@ -41,10 +43,12 @@ class BatchManager:
             # 4. Camada Gold (Silver -> Gold Aggregates)
             self._run_gold_layer()
 
-            self.logger.info("Pipeline Northwind finalizado com sucesso")
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            self.logger.info("Pipeline Northwind finalizado com sucesso", elapsed_ms=elapsed_ms)
 
         except Exception as e:
-            self.logger.critical("Falha crítica no pipeline batch", error=str(e))
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            self.logger.critical("Falha crítica no pipeline batch", error=str(e), elapsed_ms=elapsed_ms)
             raise
 
     def _run_ingestion(self):

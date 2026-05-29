@@ -28,7 +28,7 @@ services:
     container_name: northwind-clickhouse
     ports:
       - "8123:8123"   # HTTP
-      - "9000:9000"   # Native
+      - "9005:9000"   # Native (remapped on host)
     environment:
       CLICKHOUSE_DB: northwind
       CLICKHOUSE_USER: ${CH_USER:-admin}
@@ -64,6 +64,8 @@ services:
       - CH_USER=${CH_USER:-admin}
       - CH_PASSWORD=${CH_PASSWORD:-password123}
       - LOG_LEVEL=INFO
+    volumes:
+      - ./documents:/app/documents
     networks:
       - northwind-network
 
@@ -83,6 +85,8 @@ services:
       - CH_PORT=8123
       - CH_USER=${CH_USER:-admin}
       - CH_PASSWORD=${CH_PASSWORD:-password123}
+    volumes:
+      - ./src:/app/src
     networks:
       - northwind-network
 

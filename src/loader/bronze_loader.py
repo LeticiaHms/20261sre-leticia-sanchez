@@ -18,33 +18,40 @@ class BronzeLoader:
         self.unixtime = int(time.time())
 
     def load_csv_to_raw(self, file_path, tag):
-        """Converte CSV para JSON e insere na camada Raw."""
+        """Converte CSV para JSON e insere na camada Raw em chunks."""
         logger.info(f"Iniciando carga Raw: {tag}", unixtime=self.unixtime)
         
         try:
-            # Lendo CSV via Pandas
-            df = pd.read_csv(file_path)
+            total_inserted = 0
+            chunk_size = 10000
             
-            # Convertendo cada linha para JSON string
-            # record_json é uma lista de strings JSON
-            records_json = df.apply(lambda x: x.to_json(), axis=1).tolist()
+            # Lendo CSV via Pandas em Chunks para não estourar memória
+            for df_chunk in pd.read_csv(file_path, chunksize=chunk_size):
+                # Data Validation (Robustness): Remover linhas completamente vazias
+                df_chunk = df_chunk.dropna(how='all')
+                if df_chunk.empty:
+                    continue
+
+                # Convertendo cada linha para JSON string
+                records_json = df_chunk.apply(lambda x: x.to_json(), axis=1).tolist()
+                
+                # Preparando dados para o ClickHouse
+                data_to_insert = [
+                    (self.unixtime, row_json, tag)
+                    for row_json in records_json
+                ]
+                
+                # Inserção em lote (Bulk Insert) do chunk
+                self.client.insert(
+                    'ingestion',
+                    data_to_insert,
+                    column_names=['unixtime', 'data', 'tag'],
+                    database='northwind_raw'
+                )
+                total_inserted += len(data_to_insert)
             
-            # Preparando dados para o ClickHouse (unixtime, data, tag)
-            data_to_insert = [
-                (self.unixtime, row_json, tag)
-                for row_json in records_json
-            ]
-            
-            # Inserção em lote (Bulk Insert)
-            self.client.insert(
-                'ingestion',
-                data_to_insert,
-                column_names=['unixtime', 'data', 'tag'],
-                database='northwind_raw'
-            )
-            
-            logger.info(f"Carga Raw finalizada: {tag}", count=len(data_to_insert))
-            return len(data_to_insert)
+            logger.info(f"Carga Raw finalizada: {tag}", count=total_inserted)
+            return total_inserted
 
         except Exception as e:
             logger.error(f"Erro na carga Raw para {tag}: {str(e)}")
