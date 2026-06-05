@@ -2,6 +2,10 @@
 
 Este índice centraliza todos os artefatos técnicos e de planejamento produzidos para o projeto Northwind Data Pipeline, facilitando a navegação entre os documentos de engenharia e SRE.
 
+---
+⬅️ **[Voltar para o README Principal](../README.md)**
+---
+
 ## 1. Definição do Problema
 - [00_problem.md](spec/00_problem.md): Especificação original do desafio técnico e contexto do negócio.
 
