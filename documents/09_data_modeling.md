@@ -5,16 +5,40 @@ Este documento detalha os três níveis de modelagem de dados (Conceitual, Lógi
 ## 1. Modelo Conceitual
 O modelo conceitual foca nas entidades de negócio e seus relacionamentos de alto nível.
 
+```mermaid
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ ORDER_DETAILS : contains
+    PRODUCT ||--o{ ORDER_DETAILS : included_in
+    EMPLOYEE ||--o{ ORDER : handles
+    
+    ORDER {
+        int order_id
+        string customer_id
+        date order_date
+        string ship_country
+    }
+    ORDER_DETAILS {
+        int order_id
+        int product_id
+        float unit_price
+        int quantity
+    }
+    CUSTOMER {
+        string customer_id
+        string company_name
+    }
+    PRODUCT {
+        int product_id
+        string product_name
+    }
+```
+
 - **Order (Pedido):** Entidade principal representando uma transação comercial.
 - **Order Details (Itens do Pedido):** Entidade dependente que detalha os produtos e quantidades de um pedido.
 - **Customer (Cliente):** Identificador do comprador.
 - **Product (Produto):** Item comercializado.
 - **Logística:** Informações de datas (pedido, envio, limite) e destino (país, cidade).
-
-**Relacionamentos:**
-- Um **Order** pode conter múltiplos **Order Details** (1:N).
-- Cada **Order Detail** está vinculado a um único **Order** (N:1).
-- Um **Order** pertence a um único **Customer**.
 
 ---
 
@@ -22,14 +46,50 @@ O modelo conceitual foca nas entidades de negócio e seus relacionamentos de alt
 O modelo lógico define a estrutura de tabelas, chaves e normalização. No contexto Medalhão, ele evolui em estágios:
 
 ### 2.1 Camada Bronze (Virtual Mirror)
-- **Tabela `bronze_orders`:** Chave Primária (`order_id`). Contém metadados de logística e cliente.
-- **Tabela `bronze_order_details`:** Chave Primária Composta (`order_id`, `product_id`). Contém métricas de venda.
+As tabelas Bronze espelham os CSVs originais como JSONs.
+
+```mermaid
+erDiagram
+    BRONZE_ORDERS {
+        string order_id PK
+        string customer_id
+        string employee_id
+        string order_date
+        string freight
+        string ship_country
+    }
+    BRONZE_ORDER_DETAILS {
+        string order_id PK, FK
+        string product_id PK, FK
+        string unit_price
+        string quantity
+        string discount
+    }
+```
 
 ### 2.2 Camada Silver (Unified & Normalized)
 - **Tabela `silver_orders_unified`:** 
     - **PK:** `(order_id, product_id)`.
     - **Descrição:** Tabela desnormalizada (Flattened) que une Pedido e Itens para facilitar a análise de performance e SLA.
     - **Regras:** Tipagem forte, limpeza de strings e cálculo de `total_price`.
+
+```mermaid
+erDiagram
+    SILVER_ORDERS_UNIFIED {
+        uint64 order_id PK
+        uint32 product_id PK
+        string customer_id
+        datetime order_date
+        decimal unit_price
+        uint16 quantity
+        float32 discount
+        decimal freight
+        decimal total_price
+        string ship_country
+        string batch_id
+    }
+```
+
 
 ---
 
