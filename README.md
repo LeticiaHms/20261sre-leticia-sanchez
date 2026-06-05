@@ -33,11 +33,11 @@ graph LR
 ```
 
 ### Componentes e Táticas de Engenharia (Bass & ATAM)
-- **MinIO (Landing Zone):** Storage compatível com S3 que atua como zona de pouso imutável para os arquivos CSV.
-- **Bronze Loader (JSON Append-Only):** Persiste dados brutos no ClickHouse; utiliza a tática de **Resource Management (Chunksize)** para evitar estouro de memória sob carga massiva.
-- **Silver Transformer (ReplacingMergeTree):** Unifica e tipa os dados; implementa a tática de **Idempotência** para garantir unicidade mesmo em caso de reprocessamento (Cenário ATAM: Falha na Ingestão).
-- **Gold Aggregator (Business Marts):** Gera agregados de BI; utiliza **Retry com Backoff** via decorator para resiliência de conexão com o banco (Tática de Disponibilidade).
-- **Streamlit Dashboard:** Interface de visualização que utiliza **Caching** (`@st.cache_data`) para reduzir a latência de consulta em 95% (Tática de Performance).
+- **MinIO (Landing Zone):** Storage compatível with S3 that acts as an immutable landing zone for CSV files.
+- **Bronze Loader (JSON Append-Only):** Persists raw data in ClickHouse; uses **Resource Management (Chunksize)** tactics to avoid memory overflow under massive load.
+- **Silver Transformer (ReplacingMergeTree):** Unifies and types data; implements **Idempotency** tactics to guarantee uniqueness even in case of reprocessing.
+- **Gold Aggregator (Business Marts):** Generates BI aggregates; uses **Retry with Backoff** via decorator for database connection resilience.
+- **Streamlit Dashboard:** Visualization interface that uses **Caching** (`@st.cache_data`) to reduce query latency.
 
 ## 6.3 Execução em Ambiente Local (Quick Start)
 ### Pré-requisitos
@@ -57,9 +57,9 @@ docker-compose up -d && sleep 5 && docker-compose run --rm etl-engine python src
 - **Badge de CI:** O status do build no topo deste README confirma a integridade do código.
 
 ### Acesso aos Serviços
-- **Dashboard Streamlit:** [http://localhost:8501](http://localhost:8501) (Ajuste o filtro de data para 1996).
-- **MinIO Console:** [http://localhost:9001](http://localhost:9001) (Login: `minioadmin` / `minioadmin`).
-- **ClickHouse Client:** Acesse via `docker exec -it clickhouse clickhouse-client`.
+- **Dashboard Streamlit:** [http://localhost:8501](http://localhost:8501)
+- **MinIO Console:** [http://localhost:9001](http://localhost:9001)
+- **ClickHouse Client:** `docker exec -it clickhouse clickhouse-client`
 
 ### Testes de Performance (SRE)
 ```bash
@@ -69,18 +69,20 @@ npm run test:load
 
 ## 6.5 Aprendizados e Trade-offs
 ### Decisões e Alternativas
-- **ClickHouse vs Postgres:** Optamos pelo ClickHouse pela sua capacidade superior de compressão e velocidade em agregações colunares, fundamentais para o volume de 100k/dia, em detrimento de transações ACID complexas que não são o foco deste pipeline analítico.
-- **Medalhão (Bronze/Silver/Gold):** Implementado para permitir o re-processamento total a partir dos dados brutos (Raw JSON) sem depender de backups externos.
+- **ClickHouse vs Postgres:** Optamos pelo ClickHouse pela sua capacidade superior de compressão e velocidade em agregações colunares.
+- **Medalhão (Bronze/Silver/Gold):** Implementado para permitir o re-processamento total a partir dos dados brutos.
 
 ### Dívida Técnica e Melhorias Produtivas
-- **Orquestração:** Atualmente o `BatchManager` é manual; em produção, utilizaríamos **Apache Airflow** ou **Prefect** para agendamento e DAGs complexas.
-- **Monitoramento:** A simulação de alertas proativos deve ser substituída por uma integração real com **Grafana/Alertmanager**.
-- **Segurança:** As credenciais estão simplificadas em arquivos `.env`; em produção, seria obrigatório o uso de um **Secret Manager (Vault/AWS Secrets)**.
+- **Orquestração:** Atualmente o `BatchManager` é manual; em produção, utilizaríamos **Apache Airflow**.
+- **Monitoramento:** A simulação de alertas deve ser substituída por uma integração real com **Grafana**.
+- **Segurança:** As credenciais estão simplificadas; em produção, seria obrigatório o uso de um **Secret Manager**.
 
 ---
 
-### Documentação Técnica Complementar
-- [Modelagem de Dados (Conceitual, Lógico, Físico)](documents/09_data_modeling.md)
-- [Esquemas Finais da Camada Gold](documents/10_gold_schema.md)
-- [Matriz de Rastreabilidade (RTM)](documents/04_rtm.md)
-- [Análise ATAM e Táticas Bass](documents/05_architecture_quality_validation.md)
+## 📂 Central de Documentação
+Para acessar o detalhamento completo dos requisitos, modelagem, planos de teste e arquitetura, clique no link abaixo:
+
+👉 **[Acesse aqui o Índice de Documentação Técnica](documents/00_index.md)**
+
+---
+*Mantido por SRE/Data Engineering Team*
