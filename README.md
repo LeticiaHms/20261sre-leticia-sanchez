@@ -1,108 +1,86 @@
-# Northwind Data Pipeline
+# Northwind Data Pipeline 🚀
 
-## 📖 O Problema
-O negócio Northwind atua no domínio de distribuição de alimentos e bebidas. Atualmente, a empresa enfrenta um gap significativo entre a geração transacional de pedidos e a visibilidade analítica necessária para a tomada de decisão.
+[![CI](https://github.com/LeticiaHms/mba-project-sre/actions/workflows/ci.yml/badge.svg)](https://github.com/LeticiaHms/mba-project-sre/actions/workflows/ci.yml)
 
-**O Desafio Principal:**
-Processar de forma confiável um volume de aproximadamente **100 mil pedidos diários** (`Orders` e `Order Details`), garantindo que o dado chegue a um banco analítico de forma idempotente (sem duplicidade) e observável. O sistema é regido por uma política estrita de "zero falhas silenciosas" (Zero Silent Failures).
+## 6.1 Objeto do Projeto
+Este projeto automatiza o fluxo de dados da Northwind, uma distribuidora de alimentos e bebidas, para resolver o atraso entre a realização de vendas e a visibilidade gerencial. Utilizando o dataset clássico de pedidos e detalhes de pedidos (Orders e Order Details), a solução processa um volume de aproximadamente 100 mil transações diárias, garantindo que gestores tenham acesso a indicadores de faturamento, performance de vendedores e eficiência logística em tempo real, eliminando processos manuais e falhas de conciliação de dados.
 
----
+## 6.2 Arquitetura Adotada
+O sistema adota o padrão **Arquitetura Medalhão** (Bronze/Silver/Gold) para garantir rastreabilidade e qualidade analítica.
 
-## 📁 Estrutura de Documentação (`/documents`)
-A fase de Engenharia e SRE já foi concluída e está totalmente documentada na pasta `documents/`. Lá você encontrará o planejamento detalhado que guia este repositório:
-
-- **Requisitos (`01_` e `02_`):** Detalhamento de 10 Requisitos Funcionais e 11 Não Funcionais (SLIs/SLOs focados em throughput e resiliência).
-- **Arquitetura (`03_`):** Visão RM-ODP e registro de 10 Decisões Arquiteturais (ADRs).
-- **Rastreabilidade (`04_rtm.md`):** Matriz RTM garantindo que cada requisito seja coberto por um componente e um teste.
-- **Planos de Teste (`05_`, `06_`, `07_`):** Estratégias de validação para Modelagem (Qualidade dos Dados), Carga (Performance/SRE via **K6**) e Segurança (Integridade).
-- **System Design (`08_system_design.md`):** O blueprint técnico detalhando a estrutura do código e os esquemas do banco.
-- **Modelagem de Dados (`09_data_modeling.md`):** Documentação dos modelos Conceitual, Lógico e Físico (3 níveis).
-- **Índice (`00_index.md`):** Guia rápido para navegar por todos esses artefatos.
-
----
-
-## 🏗️ Arquitetura Implementada
-O projeto implementa uma pipeline de dados **Batch** adotando o padrão **Arquitetura Medalhão**, orquestrada em containers via Docker.
-
-### Diagrama de Fluxo (Mermaid)
 ```mermaid
 graph LR
-    subgraph Inbound
-        CSV[northwind_orders.csv] --> MINIO[MinIO Landing Zone]
+    subgraph Inbound[Fontes de Dados]
+        CSV[CSVs Locais] --> MINIO[MinIO Landing Zone]
     end
     
-    subgraph ETL_Engine[ETL Engine - Python]
+    subgraph Processing[ETL Engine - Python]
         MINIO --> BRONZE[Bronze Loader]
         BRONZE --> SILVER[Silver Transformer]
         SILVER --> GOLD[Gold Aggregator]
     end
     
     subgraph Storage[Analytical DB - ClickHouse]
-        BRONZE -.-> T_ING[Raw Ingestion Table]
-        SILVER -.-> T_SILV[Unified Orders Table]
-        GOLD -.-> T_GOLD[Business Aggregates]
+        BRONZE -.-> T_RAW[Raw/Bronze JSON]
+        SILVER -.-> T_SILV[Silver Unified Table]
+        GOLD -.-> T_GOLD[Gold Business Marts]
     end
     
-    subgraph Visualization
-        T_GOLD --> DASH[Streamlit Executive Dashboard]
+    subgraph Viz[Observabilidade & BI]
+        T_GOLD --> DASH[Streamlit Dashboard]
+        PROMETHEUS[Logs/Metrics] -.-> SRE[Alerting System]
     end
-    
-    DASH --> SRE[Telemetry & K6 Validation]
 ```
 
-### Stack Tecnológica
-1.  **Landing Zone (MinIO):** Storage imutável (API S3) para arquivos CSV.
-2.  **ETL & Orquestração (Python):** Processamento fatiado (Chunks) para eficiência de memória.
-3.  **ClickHouse (Medalhão):**
-    - **Bronze:** JSON brutas para replay.
-    - **Silver:** Dados unificados, tipados e com idempotência via `ReplacingMergeTree`.
-    - **Gold:** Tabelas agregadas para BI (Receita, SLA, Recompra, Vendedores).
-4.  **Streamlit:** Dashboard executivo com filtros dinâmicos e escala logarítmica.
+### Componentes e Táticas de Engenharia (Bass & ATAM)
+- **MinIO (Landing Zone):** Storage compatível com S3 que atua como zona de pouso imutável para os arquivos CSV.
+- **Bronze Loader (JSON Append-Only):** Persiste dados brutos no ClickHouse; utiliza a tática de **Resource Management (Chunksize)** para evitar estouro de memória sob carga massiva.
+- **Silver Transformer (ReplacingMergeTree):** Unifica e tipa os dados; implementa a tática de **Idempotência** para garantir unicidade mesmo em caso de reprocessamento (Cenário ATAM: Falha na Ingestão).
+- **Gold Aggregator (Business Marts):** Gera agregados de BI; utiliza **Retry com Backoff** via decorator para resiliência de conexão com o banco (Tática de Disponibilidade).
+- **Streamlit Dashboard:** Interface de visualização que utiliza **Caching** (`@st.cache_data`) para reduzir a latência de consulta em 95% (Tática de Performance).
 
----
+## 6.3 Execução em Ambiente Local (Quick Start)
+### Pré-requisitos
+- Docker & Docker Compose instalados.
+- 4GB de RAM livre para os containers.
 
-## ✅ Implementado Hoje (28/05/2026)
-
-### 📈 Business Intelligence & Visualização
-- **Dashboard Executivo (`src/dashboard/app.py`):**
-    - KPIs em Tempo Real: Receita Líquida, Total de Pedidos, SLA de Entrega %, Taxa de Recompra % e Ticket Médio.
-    - Análise Temporal: Gráfico de evolução mensal da receita dos Top 10 Produtos.
-    - Performance de Vendedores: Ranking dinâmico de faturamento por funcionário.
-    - Filtros Inteligentes: Contexto por país e data aplicados em cascata por todo o dashboard.
-
-### 🛡️ Validação Arquitetural (SRE & RNFs)
-- **Táticas de Bass Implementadas:**
-    - **Retry com Backoff:** Decorator `@retry_db_operation` para resiliência de conexão com o banco.
-    - **Caching:** `@st.cache_data` no Dashboard reduzindo carga no ClickHouse em 95% em acessos repetidos.
-    - **Resource Management:** Ingestão via `chunksize` para evitar estouro de memória (OOM).
-    - **Health Checks:** Endpoint `/_stcore/health` integrado para monitoramento de uptime.
-- **Bateria de Testes K6 (`/tests/performance`):**
-    - **Load Test:** Validado com 50 usuários simultâneos (P95 < 15ms).
-    - **Stress Test:** Validado com 200 usuários (P95 < 160ms, 0% falhas).
-    - **Spike Test:** Validado com pico súbito de 300 usuários sem quedas.
-    - **Endurance Test:** Validada estabilidade prolongada sob carga constante.
-
----
-
-## 🚀 Próximos Passos
-1.  **Modelagem de Dados Formal:** Criar documentação visual dos modelos Conceitual e Lógico (ERD).
-2.  **Alertas Pró-ativos:** Implementar simulação de envio de alertas (ex: Webhook) em caso de falha crítica no `BatchManager`.
-3.  **Documentação de API/Fluxos:** Detalhar no `documents/` os esquemas finais de cada tabela na camada Gold.
-4.  **Finalização do Decision Log:** Registrar o trade-off final entre latência de cache vs consistência de dados.
-
----
-
-## 🛠️ Como Executar
+### Comando Único de Provisionamento
 ```bash
-# 1. Subir infraestrutura
-docker-compose up -d
-
-# 2. Rodar o pipeline de carga (Batch)
-docker-compose run --rm --build etl-engine python src/batch_manager.py
-
-# 3. Acessar Dashboard
-# URL: http://localhost:8501 (Ajuste o filtro de data para 1996)
-
-# 4. Rodar Testes de Performance
-k6 run tests/performance/load-test.js
+# Sobe MinIO, ClickHouse e Streamlit + Executa o Pipeline de Dados
+docker-compose up -d && sleep 5 && docker-compose run --rm etl-engine python src/batch_manager.py
 ```
+**Estimativa de tempo:** < 5 minutos para o ambiente estar 100% funcional.
+
+## 6.4 Validação do Funcionamento
+### Verificação do Pipeline
+- **Logs e Métricas Reais:** Consulte as [Evidências de Execução](documents/EXECUTION_EVIDENCE.md) para ver logs e resultados de performance.
+- **Badge de CI:** O status do build no topo deste README confirma a integridade do código.
+
+### Acesso aos Serviços
+- **Dashboard Streamlit:** [http://localhost:8501](http://localhost:8501) (Ajuste o filtro de data para 1996).
+- **MinIO Console:** [http://localhost:9001](http://localhost:9001) (Login: `minioadmin` / `minioadmin`).
+- **ClickHouse Client:** Acesse via `docker exec -it clickhouse clickhouse-client`.
+
+### Testes de Performance (SRE)
+```bash
+# Executar bateria de testes de carga (K6)
+npm run test:load
+```
+
+## 6.5 Aprendizados e Trade-offs
+### Decisões e Alternativas
+- **ClickHouse vs Postgres:** Optamos pelo ClickHouse pela sua capacidade superior de compressão e velocidade em agregações colunares, fundamentais para o volume de 100k/dia, em detrimento de transações ACID complexas que não são o foco deste pipeline analítico.
+- **Medalhão (Bronze/Silver/Gold):** Implementado para permitir o re-processamento total a partir dos dados brutos (Raw JSON) sem depender de backups externos.
+
+### Dívida Técnica e Melhorias Produtivas
+- **Orquestração:** Atualmente o `BatchManager` é manual; em produção, utilizaríamos **Apache Airflow** ou **Prefect** para agendamento e DAGs complexas.
+- **Monitoramento:** A simulação de alertas proativos deve ser substituída por uma integração real com **Grafana/Alertmanager**.
+- **Segurança:** As credenciais estão simplificadas em arquivos `.env`; em produção, seria obrigatório o uso de um **Secret Manager (Vault/AWS Secrets)**.
+
+---
+
+### Documentação Técnica Complementar
+- [Modelagem de Dados (Conceitual, Lógico, Físico)](documents/09_data_modeling.md)
+- [Esquemas Finais da Camada Gold](documents/10_gold_schema.md)
+- [Matriz de Rastreabilidade (RTM)](documents/04_rtm.md)
+- [Análise ATAM e Táticas Bass](documents/05_architecture_quality_validation.md)

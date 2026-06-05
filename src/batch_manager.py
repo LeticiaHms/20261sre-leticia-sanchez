@@ -26,6 +26,19 @@ class BatchManager:
         ]
         self.local_spec_path = "documents/spec/"
 
+    def _send_alert(self, level, message, details=None):
+        """Simula o envio de alertas para sistemas externos (Slack/OpsGenie)."""
+        alert_payload = {
+            "batch_id": self.batch_id,
+            "level": level,
+            "message": message,
+            "timestamp": time.time(),
+            "details": details or {}
+        }
+        # Simulação de Webhook
+        self.logger.warning("PROACTIVE_ALERT_SENT", **alert_payload)
+        # Em um cenário real, aqui teríamos: requests.post(WEBHOOK_URL, json=alert_payload)
+
     def run_pipeline(self):
         start_time = time.time()
         self.logger.info("Iniciando Pipeline Northwind", mode="Batch")
@@ -48,7 +61,15 @@ class BatchManager:
 
         except Exception as e:
             elapsed_ms = int((time.time() - start_time) * 1000)
-            self.logger.critical("Falha crítica no pipeline batch", error=str(e), elapsed_ms=elapsed_ms)
+            error_msg = f"Falha crítica no pipeline batch: {str(e)}"
+            self.logger.critical(error_msg, error=str(e), elapsed_ms=elapsed_ms)
+            
+            # Alerta Proativo em caso de falha
+            self._send_alert(
+                level="CRITICAL",
+                message=error_msg,
+                details={"elapsed_ms": elapsed_ms, "error_type": type(e).__name__}
+            )
             raise
 
     def _run_ingestion(self):

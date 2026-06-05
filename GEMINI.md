@@ -69,12 +69,12 @@ The Northwind Data Pipeline is a Site Reliability Engineering (SRE) and Data Eng
 - **Measurable Criteria:** Converted vague "high volume" into specific throughput estimates.
 
 ## 11. Execution Checklist
-1. [ ] Validate `northwind_orders.csv` and `northwind_order_details.csv` schemas.
-2. [ ] Design Conceptual and Logical Data Models.
-3. [ ] Set up local development environment with Docker (MinIO, ClickHouse, Streamlit).
-4. [ ] Implement CSV Ingestion with integrity checks.
-5. [ ] Develop ETL transformation logic.
-6. [ ] Implement Idempotent Load to ClickHouse.
-7. [ ] Build Streamlit Dashboard.
-8. [ ] Integrate Telemetry (logs/metrics) across all components.
-9. [ ] Document architecture and trade-offs in `README.md`.
+1. [x] Validate `northwind_orders.csv` and `northwind_order_details.csv` schemas.
+2. [x] Design Conceptual and Logical Data Models.
+3. [x] Set up local development environment with Docker (MinIO, ClickHouse, Streamlit).
+4. [x] Implement CSV Ingestion with integrity checks.
+5. [x] Develop ETL transformation logic.
+6. [x] Implement Idempotent Load to ClickHouse.
+7. [x] Build Streamlit Dashboard.
+8. [x] Integrate Telemetry (logs/metrics) across all components.
+9. [x] Document architecture and trade-offs in `README.md`.

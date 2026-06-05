@@ -17,6 +17,25 @@ class BronzeLoader:
         )
         self.unixtime = int(time.time())
 
+    def _validate_schema(self, df, tag):
+        """Valida se as colunas obrigatórias estão presentes no CSV."""
+        required_columns = {
+            "northwind_orders.csv": [
+                "order_id", "customer_id", "employee_id", "order_date", 
+                "required_date", "shipped_date", "ship_via", "freight"
+            ],
+            "northwind_order_details.csv": [
+                "order_id", "product_id", "unit_price", "quantity", "discount"
+            ]
+        }
+        
+        if tag in required_columns:
+            missing = [col for col in required_columns[tag] if col not in df.columns]
+            if missing:
+                error_msg = f"Schema inválido para {tag}. Colunas ausentes: {missing}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+        
     def load_csv_to_raw(self, file_path, tag):
         """Converte CSV para JSON e insere na camada Raw em chunks."""
         logger.info(f"Iniciando carga Raw: {tag}", unixtime=self.unixtime)
@@ -25,6 +44,10 @@ class BronzeLoader:
             total_inserted = 0
             chunk_size = 10000
             
+            # Lendo apenas o cabeçalho primeiro para validação rápida
+            header_df = pd.read_csv(file_path, nrows=0)
+            self._validate_schema(header_df, tag)
+
             # Lendo CSV via Pandas em Chunks para não estourar memória
             for df_chunk in pd.read_csv(file_path, chunksize=chunk_size):
                 # Data Validation (Robustness): Remover linhas completamente vazias
