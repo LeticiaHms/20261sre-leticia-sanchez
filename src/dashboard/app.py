@@ -26,12 +26,17 @@ st.markdown("""
     }
     [data-testid="stMetricValue"] {
         font-size: 1.8rem !important;
+        color: #333333 !important; /* Cinza escuro para visibilidade */
+    }
+    [data-testid="stMetricLabel"] {
+        color: #555555 !important; /* Cinza médio para o label */
     }
     .stMetric {
         background-color: #ffffff;
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #e0e0e0;
     }
     </style>
     """, unsafe_allow_html=True)
